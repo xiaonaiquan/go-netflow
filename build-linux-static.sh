@@ -3,14 +3,12 @@ set -euo pipefail
 
 ARCH="${1:-amd64}"
 OUT_REL="${2:-dist/netflow-linux-${ARCH}}"
-DOCKER_IMAGE="${DOCKER_IMAGE:-golang:1.22-alpine3.20}"
 
 case "${ARCH}" in
 amd64)
   ;;
 *)
   echo "unsupported arch: ${ARCH}"
-  echo "this script currently supports amd64 only"
   echo "usage: $0 [amd64] [output]"
   exit 1
   ;;
@@ -28,13 +26,26 @@ if [[ "${ID:-}" != "ubuntu" ]]; then
   exit 1
 fi
 
-if ! command -v docker >/dev/null 2>&1; then
+missing=0
+for bin in go musl-gcc pkg-config; do
+  if ! command -v "${bin}" >/dev/null 2>&1; then
+    echo "missing command: ${bin}"
+    missing=1
+  fi
+done
+
+if [[ ${missing} -ne 0 ]]; then
   cat <<EOF
-docker not found.
-Install Docker on Ubuntu first:
+Install Ubuntu build dependencies:
   sudo apt-get update
-  sudo apt-get install -y docker.io
+  sudo apt-get install -y build-essential musl-tools pkg-config libpcap-dev
 EOF
+  exit 1
+fi
+
+if ! pkg-config --exists libpcap; then
+  echo "libpcap development files not found by pkg-config"
+  echo "install: sudo apt-get install -y libpcap-dev"
   exit 1
 fi
 
@@ -47,22 +58,24 @@ ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OUT_ABS="${ROOT_DIR}/${OUT_REL}"
 mkdir -p "$(dirname "${OUT_ABS}")"
 
-echo "building static binary in Docker: ${OUT_REL}"
-docker run --rm \
-  -v "${ROOT_DIR}:/src" \
-  -w /src \
-  -e OUT_PATH="/src/${OUT_REL}" \
-  "${DOCKER_IMAGE}" \
-  sh -lc '
-    set -euo pipefail
-    apk add --no-cache build-base pkgconf linux-headers libpcap-dev libpcap-static
-    go mod download
-    CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
-      go build -trimpath \
-      -ldflags "-s -w -linkmode external -extldflags \"-static\"" \
-      -o "${OUT_PATH}" ./cmd/main.go
-    echo "build done: ${OUT_PATH}"
-    ldd "${OUT_PATH}" || true
-  '
+echo "building static binary: ${OUT_REL}"
+CGO_ENABLED=1 GOOS=linux GOARCH="${ARCH}" CC=musl-gcc \
+  go build -trimpath -tags netgo \
+  -ldflags '-s -w -linkmode external -extldflags "-static"' \
+  -o "${OUT_ABS}" ./cmd/main.go
 
-echo "done: ${OUT_ABS}"
+set +e
+LDD_OUT="$(ldd "${OUT_ABS}" 2>&1)"
+LDD_CODE=$?
+set -e
+
+if [[ "${LDD_OUT}" == *"not a dynamic executable"* ]] || [[ "${LDD_OUT}" == *"statically linked"* ]]; then
+  echo "static link check: ok"
+  echo "done: ${OUT_ABS}"
+  exit 0
+fi
+
+echo "${LDD_OUT}"
+echo "ldd exit code: ${LDD_CODE}"
+echo "static link check: failed (binary is not fully static)"
+exit 1

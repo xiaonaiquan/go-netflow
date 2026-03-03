@@ -18,7 +18,7 @@ refer nethogs source link
 
 ```
 sudo apt-get update
-sudo apt-get install -y docker.io
+sudo apt-get install -y build-essential musl-tools pkg-config libpcap-dev
 ```
 
 ### cli usage
@@ -34,12 +34,13 @@ build static Linux binary (portable, no target `libpcap.so` dependency):
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y docker.io
+sudo apt-get install -y build-essential musl-tools pkg-config libpcap-dev
 chmod +x ./build-linux-static.sh
 ./build-linux-static.sh amd64
 # output: dist/netflow-linux-amd64
 # verify static:
 ldd dist/netflow-linux-amd64
+# expect: not a dynamic executable
 ```
 
 stdout:
