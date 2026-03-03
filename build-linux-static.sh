@@ -2,15 +2,16 @@
 set -euo pipefail
 
 ARCH="${1:-amd64}"
-OUT="${2:-dist/netflow-linux-${ARCH}}"
-CC_BIN="${CC:-musl-gcc}"
+OUT_REL="${2:-dist/netflow-linux-${ARCH}}"
+DOCKER_IMAGE="${DOCKER_IMAGE:-golang:1.22-alpine3.20}"
 
 case "${ARCH}" in
-amd64 | arm64)
+amd64)
   ;;
 *)
   echo "unsupported arch: ${ARCH}"
-  echo "usage: $0 [amd64|arm64] [output]"
+  echo "this script currently supports amd64 only"
+  echo "usage: $0 [amd64] [output]"
   exit 1
   ;;
 esac
@@ -27,41 +28,41 @@ if [[ "${ID:-}" != "ubuntu" ]]; then
   exit 1
 fi
 
-if ! command -v go >/dev/null 2>&1; then
-  echo "go not found in PATH"
-  exit 1
-fi
-
-if ! command -v "${CC_BIN}" >/dev/null 2>&1; then
+if ! command -v docker >/dev/null 2>&1; then
   cat <<EOF
-${CC_BIN} not found.
-Install Ubuntu build toolchain first:
-
+docker not found.
+Install Docker on Ubuntu first:
   sudo apt-get update
-  sudo apt-get install -y build-essential musl-tools libpcap-dev
+  sudo apt-get install -y docker.io
 EOF
   exit 1
 fi
 
-mkdir -p "$(dirname "${OUT}")"
-
-echo "building static binary: ${OUT}"
-CGO_ENABLED=1 GOOS=linux GOARCH="${ARCH}" CC="${CC_BIN}" \
-  go build -trimpath \
-  -ldflags='-s -w -linkmode external -extldflags "-static"' \
-  -o "${OUT}" ./cmd/main.go
-
-echo "build done: ${OUT}"
-
-if command -v ldd >/dev/null 2>&1; then
-  set +e
-  LDD_OUT="$(ldd "${OUT}" 2>&1)"
-  LDD_CODE=$?
-  set -e
-  echo "${LDD_OUT}"
-  if [ ${LDD_CODE} -ne 0 ] || [[ "${LDD_OUT}" == *"not a dynamic executable"* ]]; then
-    echo "static link check: ok"
-  else
-    echo "static link check: warning (binary may still be dynamic)"
-  fi
+if [[ "${OUT_REL}" = /* ]]; then
+  echo "output must be a relative path under repository"
+  exit 1
 fi
+
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+OUT_ABS="${ROOT_DIR}/${OUT_REL}"
+mkdir -p "$(dirname "${OUT_ABS}")"
+
+echo "building static binary in Docker: ${OUT_REL}"
+docker run --rm \
+  -v "${ROOT_DIR}:/src" \
+  -w /src \
+  -e OUT_PATH="/src/${OUT_REL}" \
+  "${DOCKER_IMAGE}" \
+  sh -lc '
+    set -euo pipefail
+    apk add --no-cache build-base pkgconf linux-headers libpcap-dev libpcap-static
+    go mod download
+    CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+      go build -trimpath \
+      -ldflags "-s -w -linkmode external -extldflags \"-static\"" \
+      -o "${OUT_PATH}" ./cmd/main.go
+    echo "build done: ${OUT_PATH}"
+    ldd "${OUT_PATH}" || true
+  '
+
+echo "done: ${OUT_ABS}"
