@@ -30,6 +30,8 @@ type Process struct {
 
 	inodes   []string
 	revision int
+	totalIn  int64
+	totalOut int64
 }
 
 func (p *Process) getLastTrafficEntry() *trafficEntry {
@@ -47,19 +49,29 @@ func (p *Process) analyseStats(sec int) {
 
 	// avoid x / 0 to raise exception
 	if sec == 0 {
+		stats.In = p.totalIn
+		stats.Out = p.totalOut
+		p.TrafficStats = stats
 		return
 	}
+
+	var (
+		recentIn  int64
+		recentOut int64
+	)
 
 	for _, item := range p.Ring {
 		if item.Timestamp < thold {
 			continue
 		}
-		stats.In += item.In
-		stats.Out += item.Out
+		recentIn += item.In
+		recentOut += item.Out
 	}
 
-	stats.InRate = stats.In / int64(sec)
-	stats.OutRate = stats.Out / int64(sec)
+	stats.In = p.totalIn
+	stats.Out = p.totalOut
+	stats.InRate = recentIn / int64(sec)
+	stats.OutRate = recentOut / int64(sec)
 	p.TrafficStats = stats
 }
 
@@ -70,6 +82,8 @@ func (po *Process) shrink() {
 }
 
 func (po *Process) IncreaseInput(n int64) {
+	po.totalIn += n
+
 	now := time.Now().Unix()
 	if len(po.Ring) == 0 {
 		item := &trafficEntry{
@@ -97,6 +111,8 @@ func (po *Process) IncreaseInput(n int64) {
 
 // IncreaseOutput
 func (po *Process) IncreaseOutput(n int64) {
+	po.totalOut += n
+
 	// todo: format code
 	now := time.Now().Unix()
 	if len(po.Ring) == 0 {
@@ -140,6 +156,8 @@ func (p *Process) copy() *Process {
 		InodeCount:   p.InodeCount,
 		TrafficStats: stats,
 		Ring:         p.Ring,
+		totalIn:      p.totalIn,
+		totalOut:     p.totalOut,
 	}
 }
 

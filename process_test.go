@@ -93,7 +93,7 @@ func TestProcessAnalyse2(t *testing.T) {
 	}
 
 	po.analyseStats(2)
-	assert.EqualValues(t, 20, po.TrafficStats.In)
+	assert.EqualValues(t, 200, po.TrafficStats.In)
 }
 
 func TestSortedProcesses(t *testing.T) {
@@ -161,6 +161,8 @@ func TestProcessControllerGetByPID(t *testing.T) {
 	pm.Add("123", &Process{
 		Pid:          "123",
 		TrafficStats: new(trafficStatsEntry),
+		totalIn:      120,
+		totalOut:     40,
 		Ring: []*trafficEntry{
 			{
 				Timestamp: time.Now().Unix(),

@@ -22,6 +22,8 @@ func TestGetProcessByPID(t *testing.T) {
 	nf.processHash.Add("100", &Process{
 		Pid:          "100",
 		TrafficStats: new(trafficStatsEntry),
+		totalIn:      11,
+		totalOut:     7,
 		Ring: []*trafficEntry{
 			{
 				Timestamp: time.Now().Unix(),
