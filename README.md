@@ -17,8 +17,8 @@ refer nethogs source link
 ### dep
 
 ```
-yum install libpcap
-yum install libpcap-devel
+sudo apt-get update
+sudo apt-get install -y libpcap-dev
 ```
 
 ### cli usage
@@ -33,6 +33,8 @@ go run cmd/main.go --pid 12345
 build static Linux binary (portable, no target `libpcap.so` dependency):
 
 ```bash
+sudo apt-get update
+sudo apt-get install -y build-essential musl-tools libpcap-dev
 chmod +x ./build-linux-static.sh
 ./build-linux-static.sh amd64
 # output: dist/netflow-linux-amd64

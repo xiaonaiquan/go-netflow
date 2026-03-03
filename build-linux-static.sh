@@ -15,6 +15,18 @@ amd64 | arm64)
   ;;
 esac
 
+if [[ ! -r /etc/os-release ]]; then
+  echo "cannot detect os, /etc/os-release not found"
+  exit 1
+fi
+
+# shellcheck disable=SC1091
+source /etc/os-release
+if [[ "${ID:-}" != "ubuntu" ]]; then
+  echo "this script only supports Ubuntu (detected: ${ID:-unknown})"
+  exit 1
+fi
+
 if ! command -v go >/dev/null 2>&1; then
   echo "go not found in PATH"
   exit 1
@@ -23,13 +35,10 @@ fi
 if ! command -v "${CC_BIN}" >/dev/null 2>&1; then
   cat <<EOF
 ${CC_BIN} not found.
-Install static build toolchain first.
+Install Ubuntu build toolchain first:
 
-Ubuntu/Debian:
-  sudo apt-get update && sudo apt-get install -y build-essential musl-tools libpcap-dev
-
-CentOS/RHEL:
-  sudo yum install -y gcc musl-gcc libpcap-devel libpcap-static
+  sudo apt-get update
+  sudo apt-get install -y build-essential musl-tools libpcap-dev
 EOF
   exit 1
 fi
