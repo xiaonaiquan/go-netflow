@@ -30,6 +30,14 @@ go run cmd/main.go
 go run cmd/main.go --pid 12345
 ```
 
+build static Linux binary (portable, no target `libpcap.so` dependency):
+
+```bash
+chmod +x ./build-linux-static.sh
+./build-linux-static.sh amd64
+# output: dist/netflow-linux-amd64
+```
+
 stdout:
 
 ```text
