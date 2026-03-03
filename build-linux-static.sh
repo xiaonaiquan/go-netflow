@@ -67,15 +67,42 @@ CGO_ENABLED=1 GOOS=linux GOARCH="${ARCH}" CC=gcc \
 set +e
 LDD_OUT="$(ldd "${OUT_ABS}" 2>&1)"
 LDD_CODE=$?
+FILE_OUT="$(file -b "${OUT_ABS}" 2>&1)"
+FILE_CODE=$?
+READELF_OUT=""
+READELF_CODE=127
+HAS_INTERP=2
+if command -v readelf >/dev/null 2>&1; then
+  READELF_OUT="$(readelf -l "${OUT_ABS}" 2>&1)"
+  READELF_CODE=$?
+  echo "${READELF_OUT}" | grep -q "INTERP"
+  HAS_INTERP=$?
+fi
 set -e
 
-if [[ "${LDD_OUT}" == *"not a dynamic executable"* ]] || [[ "${LDD_OUT}" == *"statically linked"* ]]; then
+if [[ "${LDD_OUT}" == *"not a dynamic executable"* ]] || [[ "${LDD_OUT}" == *"statically linked"* ]] || [[ "${LDD_OUT}" == *"不是动态可执行文件"* ]]; then
   echo "static link check: ok"
+  echo "done: ${OUT_ABS}"
+  exit 0
+fi
+
+if [[ ${FILE_CODE} -eq 0 ]] && [[ "${FILE_OUT}" == *"statically linked"* ]]; then
+  echo "static link check: ok"
+  echo "done: ${OUT_ABS}"
+  exit 0
+fi
+
+if [[ ${READELF_CODE} -eq 0 ]] && [[ ${HAS_INTERP} -ne 0 ]]; then
+  echo "static link check: ok (no INTERP segment)"
   echo "done: ${OUT_ABS}"
   exit 0
 fi
 
 echo "${LDD_OUT}"
 echo "ldd exit code: ${LDD_CODE}"
+echo "${FILE_OUT}"
+if [[ -n "${READELF_OUT}" ]]; then
+  echo "${READELF_OUT}"
+fi
 echo "static link check: failed (binary is not fully static)"
 exit 1
