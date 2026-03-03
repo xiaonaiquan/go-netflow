@@ -27,7 +27,7 @@ if [[ "${ID:-}" != "ubuntu" ]]; then
 fi
 
 missing=0
-for bin in go musl-gcc pkg-config; do
+for bin in go gcc pkg-config ldd; do
   if ! command -v "${bin}" >/dev/null 2>&1; then
     echo "missing command: ${bin}"
     missing=1
@@ -36,15 +36,15 @@ done
 
 if [[ ${missing} -ne 0 ]]; then
   cat <<EOF
-Install Ubuntu build dependencies:
+install on Ubuntu:
   sudo apt-get update
-  sudo apt-get install -y build-essential musl-tools pkg-config libpcap-dev
+  sudo apt-get install -y build-essential pkg-config libpcap-dev
 EOF
   exit 1
 fi
 
 if ! pkg-config --exists libpcap; then
-  echo "libpcap development files not found by pkg-config"
+  echo "libpcap headers/libs not found"
   echo "install: sudo apt-get install -y libpcap-dev"
   exit 1
 fi
@@ -59,8 +59,8 @@ OUT_ABS="${ROOT_DIR}/${OUT_REL}"
 mkdir -p "$(dirname "${OUT_ABS}")"
 
 echo "building static binary: ${OUT_REL}"
-CGO_ENABLED=1 GOOS=linux GOARCH="${ARCH}" CC=musl-gcc \
-  go build -trimpath -tags netgo \
+CGO_ENABLED=1 GOOS=linux GOARCH="${ARCH}" CC=gcc \
+  go build -trimpath -tags 'netgo osusergo' \
   -ldflags '-s -w -linkmode external -extldflags "-static"' \
   -o "${OUT_ABS}" ./cmd/main.go
 
